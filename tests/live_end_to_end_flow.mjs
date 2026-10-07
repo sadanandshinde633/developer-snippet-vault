@@ -1,7 +1,21 @@
 import http from 'http';
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
-dotenv.config({ path: '.env' });
+import fs from 'fs';
+import path from 'path';
+for (const f of ['.env.local', '.env']) {
+  const p = path.resolve(process.cwd(), f);
+  if (fs.existsSync(p)) {
+    for (const line of fs.readFileSync(p, 'utf-8').split(/\r?\n/)) {
+      const t = line.trim();
+      if (!t || t.startsWith('#')) continue;
+      const eq = t.indexOf('=');
+      if (eq !== -1) {
+        const k = t.slice(0, eq).trim();
+        const v = t.slice(eq + 1).trim().replace(/^["']|["']$/g, '');
+        if (k && !process.env[k]) process.env[k] = v;
+      }
+    }
+  }
+}
 import { MongoClient, ObjectId } from 'mongodb';
 
 const PORT = 3000;

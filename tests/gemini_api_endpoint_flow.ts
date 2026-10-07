@@ -1,6 +1,5 @@
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
-dotenv.config({ path: '.env' });
+import { loadTestEnv } from './env_helper';
+loadTestEnv();
 
 import { POST as analyzeHandler } from '../src/app/api/ai/analyze/route';
 import { POST as createSnippetHandler, GET as getSnippetsHandler } from '../src/app/api/snippets/route';

@@ -1,6 +1,5 @@
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
-dotenv.config({ path: '.env' });
+import { loadTestEnv } from './env_helper';
+loadTestEnv();
 import { getDb } from '../src/lib/mongodb';
 import { createUser, createSnippet, findSnippets, findSnippetById, updateSnippet, deleteSnippet } from '../src/lib/db';
 import { hashPassword, verifyPassword, signToken, verifyToken } from '../src/lib/auth';
