@@ -80,4 +80,21 @@ export async function getCurrentUser(request?: NextRequest | Request): Promise<U
   return verifyToken(token);
 }
 
+export function getBaseUrl(request?: NextRequest | Request): string {
+  if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL.replace(/\/$/, '');
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL.replace(/\/$/, '')}`;
+
+  if (request) {
+    const proto = request.headers.get('x-forwarded-proto') || 'http';
+    const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
+    if (host) return `${proto}://${host}`;
+    if ('nextUrl' in request && (request as NextRequest).nextUrl?.origin) {
+      return (request as NextRequest).nextUrl.origin;
+    }
+  }
+
+  return 'http://localhost:3000';
+}
+
 export { COOKIE_NAME };

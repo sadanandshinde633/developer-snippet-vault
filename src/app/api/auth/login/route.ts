@@ -19,6 +19,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
     }
 
+    if (!user.passwordHash) {
+      return NextResponse.json({
+        error: 'This account was registered using a social provider (GitHub or Google). Please sign in using that provider.',
+      }, { status: 400 });
+    }
+
     const isValid = await verifyPassword(password, user.passwordHash);
     if (!isValid) {
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });

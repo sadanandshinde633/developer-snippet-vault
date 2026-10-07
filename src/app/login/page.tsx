@@ -19,14 +19,29 @@ function LoginForm() {
 
   useEffect(() => {
     const oauthNotice = searchParams.get('oauth_notice');
+    const noticeParam = searchParams.get('notice');
+    const errorParam = searchParams.get('error');
+
     if (oauthNotice === 'github_unconfigured') {
       setNotice(
-        'GitHub OAuth requires GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to be configured in .env.local. You can sign in immediately using Email & Password below.'
+        'GitHub OAuth credentials (GITHUB_CLIENT_ID & GITHUB_CLIENT_SECRET) are not configured in .env.local yet. You can sign in immediately using Email & Password below.'
       );
     } else if (oauthNotice === 'google_unconfigured') {
       setNotice(
-        'Google OAuth requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to be configured in .env.local. You can sign in immediately using Email & Password below.'
+        'Google OAuth credentials (GOOGLE_CLIENT_ID & GOOGLE_CLIENT_SECRET) are not configured in .env.local yet. You can sign in immediately using Email & Password below.'
       );
+    } else if (noticeParam === 'oauth_cancelled') {
+      setNotice('Sign in with OAuth provider was cancelled.');
+    }
+
+    if (errorParam === 'oauth_failed') {
+      setError('OAuth authentication failed. Please try again or sign in with email.');
+    } else if (errorParam === 'token_exchange_failed') {
+      setError('Could not complete authorization code exchange with provider.');
+    } else if (errorParam === 'email_not_accessible') {
+      setError('Your OAuth account does not share a verified email address.');
+    } else if (errorParam === 'oauth_internal_error') {
+      setError('Internal server error during OAuth login. Please try again.');
     }
   }, [searchParams]);
 

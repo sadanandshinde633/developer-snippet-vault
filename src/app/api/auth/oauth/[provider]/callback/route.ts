@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findUserByEmail, createUser } from '@/lib/db';
-import { hashPassword, signToken, COOKIE_NAME } from '@/lib/auth';
+import { findOrCreateOAuthUser } from '@/lib/db';
+import { signToken, COOKIE_NAME, getBaseUrl } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,31 +9,37 @@ export async function GET(
   { params }: { params: { provider: string } }
 ) {
   const { provider } = params;
-  const baseUrl = req.nextUrl.origin;
+  const baseUrl = getBaseUrl(req);
   const code = req.nextUrl.searchParams.get('code');
   const errorParam = req.nextUrl.searchParams.get('error');
 
+  // Handle user cancelling the OAuth authorization flow on GitHub/Google
   if (errorParam || !code) {
-    console.error(`OAuth error from ${provider}:`, errorParam || 'No code provided');
-    return NextResponse.redirect(`${baseUrl}/login?error=oauth_denied`);
+    if (errorParam === 'access_denied') {
+      return NextResponse.redirect(`${baseUrl}/login?notice=oauth_cancelled`);
+    }
+    console.error(`OAuth error parameter from ${provider}:`, errorParam || 'Missing code');
+    return NextResponse.redirect(`${baseUrl}/login?error=oauth_failed`);
   }
 
   try {
     let email = '';
     let name = '';
+    let image: string | null = null;
+    let providerAccountId = '';
 
     // ===================================
     // 1. GITHUB OAUTH CALLBACK
     // ===================================
     if (provider === 'github') {
-      const clientId = process.env.GITHUB_CLIENT_ID;
-      const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+      const clientId = process.env.GITHUB_CLIENT_ID?.trim();
+      const clientSecret = process.env.GITHUB_CLIENT_SECRET?.trim();
 
       if (!clientId || !clientSecret) {
         return NextResponse.redirect(`${baseUrl}/login?oauth_notice=github_unconfigured`);
       }
 
-      // Exchange code for access token
+      // Exchange authorization code for access token
       const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
         method: 'POST',
         headers: {
@@ -49,11 +55,11 @@ export async function GET(
 
       const tokenData = await tokenRes.json();
       if (!tokenData.access_token) {
-        console.error('GitHub token exchange error:', tokenData);
+        console.error('GitHub token exchange response error:', tokenData);
         return NextResponse.redirect(`${baseUrl}/login?error=token_exchange_failed`);
       }
 
-      // Fetch user profile
+      // Fetch user profile from GitHub API
       const userRes = await fetch('https://api.github.com/user', {
         headers: {
           Authorization: `Bearer ${tokenData.access_token}`,
@@ -63,8 +69,10 @@ export async function GET(
       const userData = await userRes.json();
       name = userData.name || userData.login || 'GitHub Developer';
       email = userData.email;
+      image = userData.avatar_url || null;
+      providerAccountId = String(userData.id);
 
-      // If email is private on GitHub, fetch user emails
+      // If user has a private email on GitHub, query their email addresses
       if (!email) {
         const emailsRes = await fetch('https://api.github.com/user/emails', {
           headers: {
@@ -88,8 +96,8 @@ export async function GET(
     // 2. GOOGLE OAUTH CALLBACK
     // ===================================
     else if (provider === 'google') {
-      const clientId = process.env.GOOGLE_CLIENT_ID;
-      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+      const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
 
       if (!clientId || !clientSecret) {
         return NextResponse.redirect(`${baseUrl}/login?oauth_notice=google_unconfigured`);
@@ -97,7 +105,7 @@ export async function GET(
 
       const redirectUri = `${baseUrl}/api/auth/oauth/google/callback`;
 
-      // Exchange code for access token
+      // Exchange authorization code for access token
       const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -112,17 +120,19 @@ export async function GET(
 
       const tokenData = await tokenRes.json();
       if (!tokenData.access_token) {
-        console.error('Google token exchange error:', tokenData);
+        console.error('Google token exchange response error:', tokenData);
         return NextResponse.redirect(`${baseUrl}/login?error=token_exchange_failed`);
       }
 
-      // Fetch user info
+      // Fetch user info from Google OAuth API
       const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
         headers: { Authorization: `Bearer ${tokenData.access_token}` },
       });
       const userInfo = await userInfoRes.json();
       email = userInfo.email;
       name = userInfo.name || 'Google Developer';
+      image = userInfo.picture || null;
+      providerAccountId = String(userInfo.id);
 
       if (!email) {
         return NextResponse.redirect(`${baseUrl}/login?error=email_not_accessible`);
@@ -132,24 +142,18 @@ export async function GET(
     }
 
     // ===================================
-    // 3. PERSIST OR FIND USER IN MONGODB
+    // 3. SAFE ACCOUNT LINKING & PERSISTENCE
     // ===================================
-    let user = await findUserByEmail(email);
-
-    if (!user) {
-      // Create user with a generated password hash
-      const randomPassword = `oauth_${Math.random().toString(36).slice(2)}_${Date.now()}`;
-      const passwordHash = await hashPassword(randomPassword);
-
-      user = await createUser({
-        email,
-        name,
-        passwordHash,
-      });
-    }
+    const user = await findOrCreateOAuthUser({
+      email,
+      name,
+      image,
+      provider: provider as 'github' | 'google',
+      providerAccountId,
+    });
 
     // ===================================
-    // 4. SIGN SESSION JWT AND SET COOKIE
+    // 4. SIGN SESSION TOKEN AND SET COOKIE
     // ===================================
     const sessionUser = { id: user._id, email: user.email, name: user.name };
     const token = signToken(sessionUser);

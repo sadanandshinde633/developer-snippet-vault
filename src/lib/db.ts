@@ -2,11 +2,19 @@ import { ObjectId } from 'mongodb';
 import { getDb, isMongoConfigured } from './mongodb';
 import { SnippetDTO } from './types';
 
+export interface UserAccount {
+  provider: 'github' | 'google' | 'credentials';
+  providerAccountId?: string;
+  linkedAt: Date;
+}
+
 export interface UserDoc {
   _id: string;
   email: string;
   name: string | null;
-  passwordHash: string;
+  image?: string | null;
+  passwordHash?: string | null;
+  accounts?: UserAccount[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -143,6 +151,132 @@ export async function createUser(data: { email: string; name?: string | null; pa
   };
   memoryUsers.set(id, user);
   return user;
+}
+
+export async function findOrCreateOAuthUser(data: {
+  email: string;
+  name?: string | null;
+  image?: string | null;
+  provider: 'github' | 'google';
+  providerAccountId?: string;
+}): Promise<UserDoc> {
+  const normalized = data.email.toLowerCase().trim();
+  const now = new Date();
+
+  if (isMongoConfigured()) {
+    try {
+      const db = await getDb();
+      const existing = await db.collection('users').findOne({ email: normalized });
+
+      if (existing) {
+        // Safe Account Linking: Add provider if not already linked, and update name/image if missing
+        const existingAccounts: UserAccount[] = existing.accounts || [];
+        const alreadyLinked = existingAccounts.some(
+          (a) => a.provider === data.provider && (!data.providerAccountId || a.providerAccountId === data.providerAccountId)
+        );
+
+        const setUpdates: any = { updatedAt: now };
+        if (!existing.name && data.name) setUpdates.name = data.name.trim();
+        if (!existing.image && data.image) setUpdates.image = data.image;
+
+        const updateOp: any = {};
+        if (Object.keys(setUpdates).length > 0) updateOp.$set = setUpdates;
+        if (!alreadyLinked) {
+          updateOp.$push = {
+            accounts: {
+              provider: data.provider,
+              providerAccountId: data.providerAccountId,
+              linkedAt: now,
+            },
+          };
+        }
+
+        if (Object.keys(updateOp).length > 0) {
+          await db.collection('users').updateOne({ _id: existing._id }, updateOp);
+        }
+
+        return {
+          _id: existing._id.toString(),
+          email: existing.email,
+          name: setUpdates.name || existing.name || null,
+          image: setUpdates.image || existing.image || null,
+          passwordHash: existing.passwordHash,
+          accounts: existing.accounts,
+          createdAt: existing.createdAt,
+          updatedAt: now,
+        };
+      }
+
+      // New user from OAuth
+      const newAccounts: UserAccount[] = [
+        {
+          provider: data.provider,
+          providerAccountId: data.providerAccountId,
+          linkedAt: now,
+        },
+      ];
+
+      const res = await db.collection('users').insertOne({
+        email: normalized,
+        name: data.name?.trim() || null,
+        image: data.image || null,
+        passwordHash: null,
+        accounts: newAccounts,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      return {
+        _id: res.insertedId.toString(),
+        email: normalized,
+        name: data.name?.trim() || null,
+        image: data.image || null,
+        passwordHash: null,
+        accounts: newAccounts,
+        createdAt: now,
+        updatedAt: now,
+      };
+    } catch (err) {
+      console.error('MongoDB findOrCreateOAuthUser error:', err);
+      throw err;
+    }
+  }
+
+  // Fallback in-memory store
+  for (const u of memoryUsers.values()) {
+    if (u.email === normalized) {
+      const existingAccounts = u.accounts || [];
+      if (!existingAccounts.some((a) => a.provider === data.provider)) {
+        existingAccounts.push({
+          provider: data.provider,
+          providerAccountId: data.providerAccountId,
+          linkedAt: now,
+        });
+        u.accounts = existingAccounts;
+      }
+      return u;
+    }
+  }
+
+  const id = new ObjectId().toString();
+  const newUser: UserDoc = {
+    _id: id,
+    email: normalized,
+    name: data.name?.trim() || null,
+    image: data.image || null,
+    passwordHash: null,
+    accounts: [
+      {
+        provider: data.provider,
+        providerAccountId: data.providerAccountId,
+        linkedAt: now,
+      },
+    ],
+    createdAt: now,
+    updatedAt: now,
+  };
+  memoryUsers.set(id, newUser);
+  return newUser;
 }
 
 // ========================

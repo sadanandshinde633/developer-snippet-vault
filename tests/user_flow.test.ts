@@ -33,7 +33,8 @@ describe('Complete Real User Flow & Security Verification (Section 19)', () => {
     // 2. Login
     const foundUser = await findUserByEmail(email);
     expect(foundUser).not.toBeNull();
-    const isPasswordValid = await verifyPassword(rawPass, foundUser!.passwordHash);
+    expect(foundUser!.passwordHash).toBeDefined();
+    const isPasswordValid = await verifyPassword(rawPass, foundUser!.passwordHash!);
     expect(isPasswordValid).toBe(true);
 
     const token = signToken({ id: foundUser!._id, email: foundUser!.email, name: foundUser!.name });
