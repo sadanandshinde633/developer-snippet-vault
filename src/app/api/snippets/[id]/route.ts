@@ -54,7 +54,11 @@ export async function PUT(
 
     // Optional re-analysis if requested
     if (autoAnalyze && code) {
-      const aiResult = await analyzeCodeWithGemini(code, language || 'javascript');
+      const aiResult = await analyzeCodeWithGemini({
+        title,
+        code,
+        language: language || 'javascript',
+      });
       tags = aiResult.tags;
       summary = aiResult.summary;
     }

@@ -63,7 +63,11 @@ export async function POST(req: NextRequest) {
 
     // AI Auto-Tagging & Summarization integration if not explicitly provided
     if (!summary || !tags || !Array.isArray(tags) || tags.length === 0) {
-      const aiResult = await analyzeCodeWithGemini(code, language);
+      const aiResult = await analyzeCodeWithGemini({
+        title: title.trim(),
+        code,
+        language,
+      });
       if (!summary) summary = aiResult.summary;
       if (!tags || tags.length === 0) tags = aiResult.tags;
     }

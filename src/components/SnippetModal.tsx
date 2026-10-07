@@ -45,6 +45,7 @@ export default function SnippetModal({
   const [tagInput, setTagInput] = useState('');
   const [isPublic, setIsPublic] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [aiGenerated, setAiGenerated] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +67,7 @@ export default function SnippetModal({
       setTags([]);
       setIsPublic(false);
     }
+    setAiGenerated(false);
     setError(null);
   }, [snippetToEdit, isOpen]);
 
@@ -89,13 +91,18 @@ export default function SnippetModal({
     }
 
     setAnalyzing(true);
+    setAiGenerated(false);
     setError(null);
 
     try {
       const res = await fetch('/api/ai/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, language }),
+        body: JSON.stringify({
+          title: title.trim(),
+          code,
+          language,
+        }),
       });
 
       if (!res.ok) {
@@ -110,6 +117,7 @@ export default function SnippetModal({
         const uniqueTags = Array.from(new Set([...tags, ...data.tags]));
         setTags(uniqueTags);
       }
+      setAiGenerated(true);
     } catch (err: any) {
       setError(err.message || 'Failed to generate AI tags and summary.');
     } finally {
@@ -269,24 +277,32 @@ export default function SnippetModal({
               <label htmlFor="snippet-code" className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Code Content <span className="text-rose-500">*</span>
               </label>
-              <button
-                type="button"
-                onClick={handleAutoAnalyze}
-                disabled={analyzing || !code.trim()}
-                className="inline-flex items-center space-x-1.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80 rounded-md text-xs font-medium transition disabled:opacity-40"
-              >
-                {analyzing ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Generating AI tags & summary...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                    <span>Auto-Generate Tags & Summary</span>
-                  </>
+              <div className="flex items-center space-x-2">
+                {aiGenerated && (
+                  <span className="inline-flex items-center space-x-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                    <Sparkles className="w-3 h-3 text-emerald-500" />
+                    <span>AI metadata ready</span>
+                  </span>
                 )}
-              </button>
+                <button
+                  type="button"
+                  onClick={handleAutoAnalyze}
+                  disabled={analyzing || !code.trim()}
+                  className="inline-flex items-center space-x-1.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80 rounded-md text-xs font-medium transition disabled:opacity-40"
+                >
+                  {analyzing ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Generating AI tags & summary...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>Auto-Generate Tags & Summary</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
             <textarea
               id="snippet-code"
@@ -386,13 +402,17 @@ export default function SnippetModal({
               </button>
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || analyzing}
                 className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition flex items-center space-x-1.5 disabled:opacity-50"
               >
                 {saving ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Saving snippet...</span>
+                    <span>
+                      {!summary || tags.length === 0
+                        ? 'Generating AI tags & saving...'
+                        : 'Saving snippet...'}
+                    </span>
                   </>
                 ) : (
                   <>
