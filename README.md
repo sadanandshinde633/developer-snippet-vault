@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🚀 Developer Snippet Vault & AI Publisher
 
 A modern full-stack web application for developers to store, manage, and publish code snippets, technical notes, and Markdown documentation. Features real-time AI auto-tagging and plain-English summarization powered by the **Google Gemini API (`@google/genai`)**, secure user authentication, syntax highlighting, and 100% automated test coverage.
@@ -171,3 +172,6 @@ In the Vercel project configuration page, expand **Environment Variables** and a
 - **Email**: `demo@snippetvault.dev`
 - **Password**: `developer123`
 *(Or click "Sign In" > "Don't have an account? Sign up" to register your own account!)*
+=======
+# developer-snippet-vault
+>>>>>>> 6fa3ec747359e14f0a2733ab25161264050f1aa5
