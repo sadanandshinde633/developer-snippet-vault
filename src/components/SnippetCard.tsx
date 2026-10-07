@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Copy, Check, Edit3, Trash2, Globe, Lock, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
@@ -16,6 +16,7 @@ import 'prismjs/components/prism-cpp';
 import 'prismjs/components/prism-csharp';
 import 'prismjs/components/prism-go';
 import 'prismjs/components/prism-rust';
+import 'prismjs/components/prism-markup-templating';
 import 'prismjs/components/prism-php';
 import 'prismjs/components/prism-markdown';
 import { SnippetDTO } from '@/lib/types';
@@ -38,9 +39,16 @@ export default function SnippetCard({
 }: SnippetCardProps) {
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const codeRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    Prism.highlightAll();
+    if (codeRef.current) {
+      try {
+        Prism.highlightElement(codeRef.current);
+      } catch (err) {
+        console.warn('Prism highlighting notice:', err);
+      }
+    }
   }, [snippet.code, snippet.language]);
 
   const handleCopy = async () => {
@@ -154,7 +162,7 @@ export default function SnippetCard({
             isLong && !isExpanded ? 'max-h-52 overflow-y-hidden' : ''
           }`}
         >
-          <code className={`language-${snippet.language}`}>{snippet.code}</code>
+          <code ref={codeRef} className={`language-${snippet.language}`}>{snippet.code}</code>
         </pre>
 
         {isLong && !isExpanded && (
