@@ -53,6 +53,9 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (error: any) {
     console.error('Registration error:', error);
-    return NextResponse.json({ error: 'Internal server error while registering user.' }, { status: 500 });
+    const msg = error?.message?.includes('auth') || error?.message?.includes('Mongo')
+      ? `Database error: ${error.message}`
+      : (error?.message || 'Internal server error while registering user.');
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
