@@ -21,6 +21,7 @@ function LoginForm() {
     const oauthNotice = searchParams.get('oauth_notice');
     const noticeParam = searchParams.get('notice');
     const errorParam = searchParams.get('error');
+    const detailsParam = searchParams.get('details');
 
     if (oauthNotice === 'github_unconfigured') {
       setNotice(
@@ -40,6 +41,12 @@ function LoginForm() {
       setError('Could not complete authorization code exchange with provider.');
     } else if (errorParam === 'email_not_accessible') {
       setError('Your OAuth account does not share a verified email address.');
+    } else if (errorParam === 'db_error') {
+      setError(
+        detailsParam
+          ? decodeURIComponent(detailsParam)
+          : 'Database connection failed. Please verify your MongoDB configuration.'
+      );
     } else if (errorParam === 'oauth_internal_error') {
       setError('Internal server error during OAuth login. Please try again.');
     }

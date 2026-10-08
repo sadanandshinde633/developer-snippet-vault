@@ -170,8 +170,20 @@ export async function GET(
     });
 
     return response;
-  } catch (error) {
+  } catch (error: any) {
     console.error(`OAuth callback handler error for ${provider}:`, error);
+    const isDbError =
+      error?.message?.includes('auth') ||
+      error?.message?.includes('Mongo') ||
+      error?.name?.includes('Mongo');
+    if (isDbError) {
+      const cleanMsg = encodeURIComponent(
+        error?.message?.includes('bad auth')
+          ? 'MongoDB authentication failed. Please verify database username and password in MONGODB_URI.'
+          : error?.message || 'Database connection error'
+      );
+      return NextResponse.redirect(`${baseUrl}/login?error=db_error&details=${cleanMsg}`);
+    }
     return NextResponse.redirect(`${baseUrl}/login?error=oauth_internal_error`);
   }
 }

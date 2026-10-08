@@ -87,6 +87,15 @@ async function testRoutes() {
   }
   delete process.env.VERCEL_URL;
 
+  // Test 7: Missing code redirects to error=oauth_failed
+  const req7 = new NextRequest('http://localhost:3000/api/auth/oauth/google/callback');
+  const res7 = await handleOAuthCallback(req7, { params: { provider: 'google' } });
+  const loc7 = res7.headers.get('location');
+  console.log('7. Missing code redirect:', loc7);
+  if (!loc7?.includes('error=oauth_failed')) {
+    throw new Error('Expected missing code to redirect to error=oauth_failed');
+  }
+
   // Restore env
   if (prevGithubId) process.env.GITHUB_CLIENT_ID = prevGithubId;
   else delete process.env.GITHUB_CLIENT_ID;

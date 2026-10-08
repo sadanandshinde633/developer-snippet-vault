@@ -201,7 +201,16 @@ export async function findOrCreateOAuthUser(data: {
           name: setUpdates.name || existing.name || null,
           image: setUpdates.image || existing.image || null,
           passwordHash: existing.passwordHash,
-          accounts: existing.accounts,
+          accounts: alreadyLinked
+            ? existingAccounts
+            : [
+                ...existingAccounts,
+                {
+                  provider: data.provider,
+                  providerAccountId: data.providerAccountId,
+                  linkedAt: now,
+                },
+              ],
           createdAt: existing.createdAt,
           updatedAt: now,
         };
