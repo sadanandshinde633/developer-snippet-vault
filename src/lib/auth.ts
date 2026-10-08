@@ -81,17 +81,29 @@ export async function getCurrentUser(request?: NextRequest | Request): Promise<U
 }
 
 export function getBaseUrl(request?: NextRequest | Request): string {
-  if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL.replace(/\/$/, '');
+  // 1. Explicit canonical URL overrides
   if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL.replace(/\/$/, '')}`;
+  if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL.replace(/\/$/, '');
 
+  // 2. Derive directly from the incoming HTTP request (ensures production custom domain / Vercel alias is used)
   if (request) {
-    const proto = request.headers.get('x-forwarded-proto') || 'http';
     const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
-    if (host) return `${proto}://${host}`;
+    if (host) {
+      const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+      const proto = request.headers.get('x-forwarded-proto') || (isLocal ? 'http' : 'https');
+      return `${proto}://${host}`;
+    }
     if ('nextUrl' in request && (request as NextRequest).nextUrl?.origin) {
       return (request as NextRequest).nextUrl.origin;
     }
+  }
+
+  // 3. Fallback to Vercel production URL or deployment URL if request object is unavailable
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL.replace(/\/$/, '')}`;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL.replace(/\/$/, '')}`;
   }
 
   return 'http://localhost:3000';

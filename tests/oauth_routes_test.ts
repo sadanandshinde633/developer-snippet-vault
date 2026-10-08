@@ -67,6 +67,26 @@ async function testRoutes() {
     throw new Error('Expected cancellation to redirect to notice=oauth_cancelled');
   }
 
+  // Test 6: Production Vercel request with x-forwarded-host derives canonical alias even when VERCEL_URL is set
+  process.env.VERCEL_URL = 'developer-snippet-vault-2hugvcyub-sadanand.vercel.app';
+  const req6 = new NextRequest('https://developer-snippet-vault-gold.vercel.app/api/auth/oauth/google', {
+    headers: {
+      'x-forwarded-host': 'developer-snippet-vault-gold.vercel.app',
+      'x-forwarded-proto': 'https',
+    },
+  });
+  const res6 = await handleOAuthInit(req6, { params: { provider: 'google' } });
+  const loc6 = res6.headers.get('location');
+  console.log('6. Vercel production redirect URI:', loc6);
+  if (
+    !loc6?.includes(
+      'redirect_uri=https%3A%2F%2Fdeveloper-snippet-vault-gold.vercel.app%2Fapi%2Fauth%2Foauth%2Fgoogle%2Fcallback'
+    )
+  ) {
+    throw new Error('Vercel production redirect URI did not match custom alias!');
+  }
+  delete process.env.VERCEL_URL;
+
   // Restore env
   if (prevGithubId) process.env.GITHUB_CLIENT_ID = prevGithubId;
   else delete process.env.GITHUB_CLIENT_ID;
